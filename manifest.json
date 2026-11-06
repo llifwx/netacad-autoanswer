@@ -34,8 +34,8 @@
   "commands": {
     "process-page-command": {
       "suggested_key": {
-        "default": "Alt+Shift+Q",
-        "mac": "Alt+Shift+Q"
+        "default": "Alt+Z",
+        "mac": "Alt+Z"
       },
       "description": "Process Questions on this Page"
     }

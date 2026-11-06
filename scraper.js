@@ -1,187 +1,61 @@
-// Constants for retry mechanism
-const MAX_SCRAPE_ATTEMPTS = 10;
-const SCRAPE_RETRY_DELAY_MS = 1500;
-
-async function scrapeData(currentAttempt = 1) {
-  console.debug(
-    `NetAcad Scraper (scraper.js): scrapeData attempt #${currentAttempt} of ${MAX_SCRAPE_ATTEMPTS}`
-  );
-
-  const storedData = await chrome.storage.sync.get(["geminiApiKey"]);
-  const apiKey = storedData.geminiApiKey;
-
-  let mcqViewElements = [];
-  let earlyExitReason = "";
-
-  try {
-    const appRoot = document.querySelector("app-root");
-    if (appRoot && appRoot.shadowRoot) {
-      const pageView = appRoot.shadowRoot.querySelector("page-view");
-      if (pageView && pageView.shadowRoot) {
-        const articleViews = pageView.shadowRoot.querySelectorAll("article-view");
-        if (articleViews && articleViews.length > 0) {
-          articleViews.forEach((articleView, i) => {
-            if (articleView.shadowRoot) {
-              const blockViews = articleView.shadowRoot.querySelectorAll("block-view");
-              blockViews.forEach((blockView, j) => {
-                if (blockView.shadowRoot) {
-                  const mcqView = blockView.shadowRoot.querySelector("mcq-view");
-                  if (mcqView) mcqViewElements.push(mcqView);
-                  const omv = blockView.shadowRoot.querySelector("object-matching-view");
-                  if (omv) mcqViewElements.push(omv);
-                }
-              });
-            }
-          });
-          if (mcqViewElements.length === 0) earlyExitReason = "Found article-view(s) but no mcq-view or object-matching-view elements.";
-        } else earlyExitReason = "page-view found, but no article-view elements.";
-      } else earlyExitReason = appRoot.shadowRoot.querySelector("page-view") ? "page-view found, but no shadowRoot." : "page-view not found in app-root.";
-    } else earlyExitReason = document.querySelector("app-root") ? "app-root found, but no shadowRoot." : "app-root not found.";
-  } catch (e) {
-    earlyExitReason = "Exception during shadow DOM traversal.";
-    console.error(`NetAcad Scraper (scraper.js): ${earlyExitReason}`, e);
-  }
-
-  if (currentAttempt === 1) {
-    document.querySelectorAll(".netacad-ai-assistant-ui[id^='netacad-ai-q-']").forEach((el) => el.remove());
-    mcqViewElements.forEach((mcqView) => {
-      if (mcqView && mcqView.shadowRoot) {
-        mcqView.shadowRoot.querySelectorAll(".netacad-ai-assistant-ui[id^='netacad-ai-q-']").forEach((el) => el.remove());
-      }
+function findQuestionElements() {
+  const found = [];
+  const pageView = document.querySelector("app-root")?.shadowRoot?.querySelector("page-view");
+  pageView?.shadowRoot?.querySelectorAll("article-view").forEach((av) => {
+    av.shadowRoot?.querySelectorAll("block-view").forEach((bv) => {
+      const sr = bv.shadowRoot;
+      if (!sr) return;
+      const q = sr.querySelector("mcq-view") || sr.querySelector("object-matching-view");
+      if (q) found.push(q);
     });
+  });
+  return found;
+}
+
+// The question the user is looking at: the one with the most visible area.
+function pickVisibleQuestion(els) {
+  let best = null, bestArea = -1;
+  for (const el of els) {
+    const r = el.getBoundingClientRect();
+    const h = Math.min(r.bottom, innerHeight) - Math.max(r.top, 0);
+    const w = Math.min(r.right, innerWidth) - Math.max(r.left, 0);
+    const area = Math.max(0, h) * Math.max(0, w);
+    if (area > bestArea) { best = el; bestArea = area; }
   }
+  return best;
+}
 
-  if (mcqViewElements.length === 0) {
-    let logMessage = `NetAcad Scraper (scraper.js): Attempt #${currentAttempt}: No mcq-view elements found.`;
-    if (earlyExitReason) logMessage += ` Reason: ${earlyExitReason}`;
-    else if (currentAttempt === 1) logMessage += ` Shadow DOM traversal completed, but no mcq-view tags were identified.`;
-    console.debug(logMessage);
-
-    if (currentAttempt < MAX_SCRAPE_ATTEMPTS) {
-      console.debug(`NetAcad Scraper (scraper.js): Will retry in ${SCRAPE_RETRY_DELAY_MS / 1000}s...`);
-      setTimeout(() => { window.scrapeData && window.scrapeData(currentAttempt + 1); }, SCRAPE_RETRY_DELAY_MS);
-      return false;
-    }
-    console.warn(`NetAcad Scraper (scraper.js): Max retry attempts reached. Failed to find mcq-view elements.`);
-    return false;
+function extractQA(el, index) {
+  if (el.tagName.toLowerCase() === "object-matching-view") {
+    const m = extractMatchingQuestion(el, index);
+    if (!m.categories.length || !m.options.length) return null;
+    return {
+      question: `MATCHING QUESTION. ${m.questionText}\nCategories: ${m.categories
+        .map((c) => `${c.letter}=${c.text}`)
+        .join(" | ")}\nOptions: ${m.options.map((o, i) => `${i + 1}=${o.text}`).join(" | ")}\nReturn answer as 'A: <option text> /// B: <option text> /// ...' in category order, using the EXACT option texts.`,
+      answers: [
+        ...m.categories.map((c) => `[CATEGORY ${c.letter}] ${c.text}`),
+        ...m.options.map((o, i) => `[OPTION ${i + 1}] ${o.text}`),
+      ],
+    };
   }
+  const ex = extractQuestionAndAnswers(el, index);
+  const answers = processAnswerElements(ex.answerElements, index);
+  if (ex.questionText.startsWith("Error") || ex.questionText === "Question text not found" || !answers.length) return null;
+  return { question: ex.questionText, answers };
+}
 
-  console.debug(
-    `NetAcad Scraper (scraper.js): Found ${mcqViewElements.length} mcq-view element(s). Attempting to process...`
-  );
+// Called on hotkey: one request for the question currently on screen.
+async function scrapeData() {
+  const els = findQuestionElements();
+  const el = pickVisibleQuestion(els);
+  if (!el) return false;
 
-  if (!apiKey) {
-    console.warn("NetAcad Scraper (scraper.js): Gemini API Key not found. Displaying message in UI.");
-    for (const [index, mcqViewElement] of mcqViewElements.entries()) {
-      // The third argument to processSingleQuestion is apiKey, the fourth is preFetchedAiAnswer
-      await processSingleQuestion(mcqViewElement, index, null, "Error: Gemini API Key not set in popup.");
-    }
-    return true; // Processed (by showing error)
-  }
+  const qa = extractQA(el, els.indexOf(el));
+  if (!qa) { showToast("?"); return false; }
 
-  const allQuestionsData = [];
-  for (const [index, mcqViewElement] of mcqViewElements.entries()) {
-    const isMatching = mcqViewElement.tagName && mcqViewElement.tagName.toLowerCase() === "object-matching-view";
-
-    if (isMatching) {
-      if (typeof extractMatchingQuestion !== "function") {
-        console.error("NetAcad Scraper: extractMatchingQuestion missing!");
-        await processSingleQuestion(mcqViewElement, index, apiKey, "Error: Core UI function (matching extract) missing.");
-        continue;
-      }
-      const m = extractMatchingQuestion(mcqViewElement, index);
-      if (m.questionText && !m.questionText.startsWith("Error") && m.categories.length > 0 && m.options.length > 0) {
-        const formattedQuestion = `MATCHING QUESTION. ${m.questionText}\nCategories: ${m.categories
-          .map((c) => `${c.letter}=${c.text}`)
-          .join(" | ")}\nOptions: ${m.options.map((o, i) => `${i + 1}=${o.text}`).join(" | ")}\nReturn answer as 'A: <option text> /// B: <option text> /// ...' in category order, using the EXACT option texts.`;
-        const answerTexts = [
-          ...m.categories.map((c) => `[CATEGORY ${c.letter}] ${c.text}`),
-          ...m.options.map((o, i) => `[OPTION ${i + 1}] ${o.text}`),
-        ];
-        allQuestionsData.push({
-          question: formattedQuestion,
-          answers: answerTexts,
-          mcqViewElement: mcqViewElement,
-          originalIndex: index,
-          questionTextElement: m.questionTextElement,
-        });
-      } else {
-        console.warn(`NetAcad Scraper: Failed to extract matching Q ${index + 1}.`);
-        await processSingleQuestion(mcqViewElement, index, apiKey, m.questionText);
-      }
-      continue;
-    }
-
-    // extractQuestionAndAnswers is in ui.js and should be globally available.
-    // It returns { questionText, answerElements, questionTextElement }
-    if (typeof extractQuestionAndAnswers !== 'function') {
-        console.error("NetAcad Scraper (scraper.js): extractQuestionAndAnswers function is not available!");
-        // Fallback: process each question individually with an error message, or just skip UI update
-        await processSingleQuestion(mcqViewElement, index, apiKey, "Error: Core UI function (extract) missing.");
-        continue;
-    }
-    const extractionResult = extractQuestionAndAnswers(mcqViewElement, index);
-    const answerTexts = processAnswerElements(extractionResult.answerElements, index);
-
-    if (extractionResult.questionText && !extractionResult.questionText.startsWith("Error") && answerTexts.length > 0) {
-      allQuestionsData.push({
-        question: extractionResult.questionText,
-        answers: answerTexts,
-        mcqViewElement: mcqViewElement,
-        originalIndex: index,
-        questionTextElement: extractionResult.questionTextElement // Needed for UI injection by processSingleQuestion
-      });
-    } else {
-      // If extraction fails for a question, still call processSingleQuestion to render its UI with the error.
-      // The error from extractionResult.questionText or lack of answers will be handled by processSingleQuestion.
-      console.warn(`NetAcad Scraper (scraper.js): Failed to extract valid Q&A for question ${index + 1}. Will let processSingleQuestion handle UI error.`);
-      await processSingleQuestion(mcqViewElement, index, apiKey, extractionResult.questionText); // Pass the extraction error
-    }
-  }
-
-  if (allQuestionsData.length > 0) {
-    console.debug(`NetAcad Scraper (scraper.js): Extracted ${allQuestionsData.length} valid questions for batch API call.`);
-    const questionsForBatchApi = allQuestionsData.map(q => ({ question: q.question, answers: q.answers }));
-    
-    // Call processSingleQuestion for each item to set up initial UI (e.g., "Processing batch...")
-    // BEFORE making the batch API call.
-    for (const questionData of allQuestionsData) {
-        // Pass a specific message to indicate batch processing is starting
-        // processSingleQuestion will need to handle this initial state message.
-        await processSingleQuestion(questionData.mcqViewElement, questionData.originalIndex, apiKey, "BATCH_PROCESSING_STARTED");
-    }
-
-    const batchApiResponse = await getAiAnswersForBatch(questionsForBatchApi, apiKey);
-    let batchedAnswers = [];
-    let batchError = null;
-
-    if (batchApiResponse.error) {
-      console.error("NetAcad Scraper (scraper.js): Error from batch API call:", batchApiResponse.error);
-      batchError = batchApiResponse.error;
-    } else if (batchApiResponse.answers && batchApiResponse.answers.length === allQuestionsData.length) {
-      batchedAnswers = batchApiResponse.answers;
-      console.debug("NetAcad Scraper (scraper.js): Successfully received batched answers.");
-    } else {
-      console.error("NetAcad Scraper (scraper.js): Mismatch in batched answers length or no answers received.");
-      batchError = "Error: AI response for batch was incomplete or malformed.";
-      if(batchApiResponse.answers) batchedAnswers = batchApiResponse.answers; // Use partial if available
-    }
-
-    // Now, update each UI with its specific answer or the batch error
-    for (let i = 0; i < allQuestionsData.length; i++) {
-      const questionData = allQuestionsData[i];
-      let finalAnswerToShow = batchError ? batchError : (batchedAnswers[i] || "Error: No specific answer in batch response.");
-      // Re-call processSingleQuestion or a dedicated update function. 
-      // For simplicity, re-calling processSingleQuestion with the fetched answer.
-      // It will re-extract, but then display the provided answer.
-      // A more optimized way would be to have a separate UI update function.
-      await processSingleQuestion(questionData.mcqViewElement, questionData.originalIndex, apiKey, finalAnswerToShow);
-    }
-  } else {
-    console.debug("NetAcad Scraper (scraper.js): No valid questions extracted to send for batch processing.");
-    // If there were mcqViewElements but none yielded valid Q&A, their UIs would have been handled
-    // in the extraction loop above, displaying individual extraction errors via processSingleQuestion.
-  }
-
+  const answer = await getAiAnswer(qa.question, qa.answers);
+  if (answer.startsWith("Error")) console.warn("NetAcad AI:", answer);
+  showToast(answer.startsWith("Error") ? "!" : answer.split(/\s*\/\/\/\s*|\n/).filter(Boolean).join("\n"));
   return true;
-} 
+}

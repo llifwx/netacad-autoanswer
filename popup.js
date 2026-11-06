@@ -5,14 +5,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const processPageButton = document.getElementById("processPage");
   const statusDiv = document.getElementById("status");
   const showAnswersToggle = document.getElementById("showAnswersToggle");
-  const processOnSwitchToggle = document.getElementById("processOnSwitchToggle");
 
   chrome.storage.sync.get(
     [
       "geminiApiKey",
       "geminiModel",
       "showAnswers",
-      "processOnSwitch",
     ],
     (result) => {
       if (result.geminiApiKey) apiKeyInput.value = result.geminiApiKey;
@@ -34,11 +32,6 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         showAnswersToggle.checked = true;
       }
-      if (typeof result.processOnSwitch === "boolean") {
-        processOnSwitchToggle.checked = result.processOnSwitch;
-      } else {
-        processOnSwitchToggle.checked = true;
-      }
 
       setTimeout(() => {
         if (
@@ -52,10 +45,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showAnswersToggle.addEventListener("change", () => {
     chrome.storage.sync.set({ showAnswers: showAnswersToggle.checked });
-  });
-
-  processOnSwitchToggle.addEventListener("change", () => {
-    chrome.storage.sync.set({ processOnSwitch: processOnSwitchToggle.checked });
   });
 
   saveKeyButton.addEventListener("click", () => {
