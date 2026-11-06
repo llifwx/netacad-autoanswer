@@ -9,7 +9,7 @@ NetAcad Assistant is a browser extension for Cisco NetAcad. Press a hotkey and i
 ## What Does It Do?
 - **On demand only:** nothing happens until you press the hotkey (or the popup button). No auto-processing on page load or question switch.
 - **One request per question:** sends only the question you're looking at (the most visible one on the page).
-- **Discreet answer:** shows the answer as small gray, semi-transparent text in the bottom-right corner for ~4 seconds, then fades out. It doesn't block clicks and doesn't change the page layout.
+- **Discreet answer:** shows the answer as tiny, faint gray text in the bottom-right corner for ~4 seconds, then fades out. A new answer replaces the previous one; it doesn't block clicks or change the page layout.
 - **Supports** single-answer, multi-answer (checkbox) and matching questions. Multiple answers are shown one per line.
 
 ## How to Install and Use
@@ -19,12 +19,12 @@ NetAcad Assistant is a browser extension for Cisco NetAcad. Press a hotkey and i
    - Go to `chrome://extensions/`.
    - Enable "Developer mode" (top right).
    - Click "Load unpacked" and select the project folder.
-4. **Configure:** click the extension icon, enter your API key, pick a Gemini model and click "Save Settings".
-5. **Use on NetAcad:** open a quiz and press **Alt+Z** (or click "Process Questions on this Page" in the popup). The answer appears in the bottom-right corner.
+4. **Configure:** click the extension icon, enter your API key, pick a model and click **Save**. The popup is compact and follows your system light/dark theme.
+5. **Use on NetAcad:** open a quiz and press **Alt+Z** (or click **Run** in the popup). The answer appears in the bottom-right corner.
 
 Status marks in the corner: `!` = API error (details in the page console), `?` = the question couldn't be read.
 
-"Show AI Answers" in the popup turns the extension off without uninstalling it.
+**Show answers** in the popup turns the extension off without uninstalling it.
 
 ### Hotkey not working?
 Chrome applies the default hotkey only on first install, and silently skips it if the combination is already taken. Set it manually at `chrome://extensions/shortcuts` → **NetAcad Scraper → Process Questions on this Page**, then reload the quiz tab.
