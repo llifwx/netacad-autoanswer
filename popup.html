@@ -3,62 +3,84 @@
 <head>
   <title>NetAcad Scraper Control</title>
   <style>
+    :root {
+      --bg: #fafafa;
+      --fg: #222;
+      --muted: #888;
+      --border: #e2e2e2;
+      --field: #fff;
+      --accent: #444;
+      --accent-fg: #fff;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1e1e1e;
+        --fg: #ddd;
+        --muted: #777;
+        --border: #333;
+        --field: #262626;
+        --accent: #ccc;
+        --accent-fg: #1e1e1e;
+      }
+    }
+    * { box-sizing: border-box; }
     body {
-      font-family: Arial, sans-serif;
-      width: 320px;
-      padding: 10px;
-      background-color: #f4f7f6;
+      margin: 0;
+      width: 260px;
+      padding: 14px;
+      font: 12px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
     }
     h3 {
-      color: #0056b3;
-      text-align: center;
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: .04em;
+      text-transform: uppercase;
     }
-    label {
-      display: block;
-      margin-top: 10px;
-      color: #333;
-    }
-    input[type="text"], input[type="password"], select {
-      width: calc(100% - 22px);
-      padding: 8px;
-      margin-top: 5px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      box-sizing: content-box;
-    }
-    select {
+    label { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 11px; }
+    input[type="password"], select {
       width: 100%;
-      box-sizing: border-box;
+      padding: 6px 8px;
+      font: inherit;
+      color: var(--fg);
+      background: var(--field);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      outline: none;
     }
+    input:focus, select:focus { border-color: var(--muted); }
+    .row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+    .row label { margin: 0; cursor: pointer; color: var(--fg); font-size: 12px; }
+    input[type="checkbox"] { margin: 0; accent-color: var(--accent); }
+    .actions { display: flex; gap: 6px; margin-top: 14px; }
     button {
-      background-color: #007bff;
-      color: white;
-      padding: 10px 15px;
-      margin-top: 15px;
-      border: none;
-      border-radius: 4px;
+      flex: 1;
+      padding: 7px 0;
+      font: inherit;
+      border-radius: 6px;
       cursor: pointer;
-      width: 100%;
-      font-size: 15px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--fg);
+      transition: opacity .15s;
     }
-    button:hover {
-      background-color: #0056b3;
-    }
-    #status {
-      margin-top: 10px;
-      text-align: center;
-      font-size: 0.9em;
-      color: #555;
-    }
+    button:hover { opacity: .75; }
+    #processPage { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+    #status { min-height: 14px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+    small { display: block; color: var(--muted); font-size: 10px; }
+    kbd { font: inherit; padding: 0 4px; border: 1px solid var(--border); border-radius: 3px; }
   </style>
 </head>
 <body>
-  <h3>NetAcad AI Assistant</h3>
+  <h3>Assistant</h3>
 
-  <label for="apiKey">Gemini API Key:</label>
-  <input type="password" id="apiKey" placeholder="Enter your Gemini API Key">
+  <label for="apiKey">API key</label>
+  <input type="password" id="apiKey" placeholder="Gemini API key">
 
-  <label for="geminiModel">Gemini Model:</label>
+  <label for="geminiModel">Model</label>
   <select id="geminiModel">
     <option value="gemini-3.1-flash-lite" selected>gemini-3.1-flash-lite</option>
     <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite</option>
@@ -68,17 +90,18 @@
     <option value="gemini-3.8-flash">gemini-3.8-flash</option>
   </select>
 
-  <div style="margin: 10px 0 0 0; display: flex; align-items: center;">
-    <input type="checkbox" id="showAnswersToggle" checked style="margin-right: 6px;">
-    <label for="showAnswersToggle" style="cursor: pointer;">Show AI Answers</label>
+  <div class="row">
+    <input type="checkbox" id="showAnswersToggle" checked>
+    <label for="showAnswersToggle">Show answers</label>
   </div>
 
-  <button id="saveKey">Save Settings</button>
-
-  <button id="processPage">Process Questions on this Page</button>
+  <div class="actions">
+    <button id="saveKey">Save</button>
+    <button id="processPage">Run</button>
+  </div>
 
   <div id="status"></div>
-  <small>You can press Alt+Z to process questions on the current page.</small>
+  <small><kbd>Alt</kbd>+<kbd>Z</kbd> on the page</small>
 
   <script src="popup.js"></script>
 </body>
