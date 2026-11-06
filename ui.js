@@ -178,17 +178,19 @@ function processAnswerElements(answerElements, index) {
 const TOAST_MS = 4000; // how long the answer stays on screen
 
 function showToast(text) {
+  document.getElementById("__nt")?.remove(); // never stack toasts
   const t = document.createElement("div");
+  t.id = "__nt";
   t.textContent = text;
   Object.assign(t.style, {
     position: "fixed",
-    right: "6px",
-    bottom: "4px",
-    maxWidth: "40vw",
+    right: "4px",
+    bottom: "2px",
+    maxWidth: "30vw",
     zIndex: "2147483647",
-    font: "11px/1.3 Arial, sans-serif",
-    color: "#888",
-    opacity: "0.55",
+    font: "10px/1.25 system-ui, sans-serif",
+    color: "#999",
+    opacity: "0.35",
     pointerEvents: "none",
     whiteSpace: "pre-wrap",
     transition: "opacity 0.4s",
