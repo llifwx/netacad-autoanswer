@@ -9,7 +9,7 @@ NetAcad Assistant is a browser extension for Cisco NetAcad. Press a hotkey and i
 ## What Does It Do?
 - **On demand only:** nothing happens until you press the hotkey (or the popup button). No auto-processing on page load or question switch.
 - **One request per question:** sends only the question you're looking at (the most visible one on the page).
-- **Discreet answer:** shows the answer as tiny, faint gray text in the bottom-right corner for ~4 seconds, then fades out. A new answer replaces the previous one; it doesn't block clicks or change the page layout.
+- **Discreet answer:** shows the answer as tiny, faint gray text in the bottom-right corner for ~7 seconds, then fades out. A new answer replaces the previous one; it doesn't block clicks or change the page layout.
 - **Supports** single-answer, multi-answer (checkbox) and matching questions. Multiple answers are shown one per line.
 
 ## How to Install and Use

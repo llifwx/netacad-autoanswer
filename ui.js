@@ -175,7 +175,7 @@ function processAnswerElements(answerElements, index) {
   return answerTexts;
 }
 
-const TOAST_MS = 4000; // how long the answer stays on screen
+const TOAST_MS = 7000; // how long the answer stays on screen
 
 function showToast(text) {
   document.getElementById("__nt")?.remove(); // never stack toasts
